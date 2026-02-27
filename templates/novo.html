@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block title %}Novo Chamado{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-8">
+    <div class="card">
+      <div class="card-header bg-gradient">
+        <h2 class="mb-0"><i class="fas fa-plus-circle"></i> Cadastro de Chamado</h2>
+      </div>
+      <div class="card-body">
+        <form method="post" novalidate>
+          {{ form.hidden_tag() }}
+          
+          <div class="mb-3">
+            {{ form.titulo.label(class="form-label") }}
+            {{ form.titulo(class="form-control" + (" is-invalid" if form.titulo.errors else "")) }}
+            {% if form.titulo.errors %}
+              <div class="invalid-feedback">{{ form.titulo.errors[0] }}</div>
+            {% endif %}
+          </div>
+
+          <div class="mb-3">
+            {{ form.descricao.label(class="form-label") }}
+            {{ form.descricao(class="form-control", rows="5" + (" is-invalid" if form.descricao.errors else "")) }}
+            {% if form.descricao.errors %}
+              <div class="invalid-feedback">{{ form.descricao.errors[0] }}</div>
+            {% endif %}
+          </div>
+
+          <div class="mb-3">
+            {{ form.area.label(class="form-label") }}
+            {{ form.area(class="form-select" + (" is-invalid" if form.area.errors else "")) }}
+            {% if form.area.errors %}
+              <div class="invalid-feedback">{{ form.area.errors[0] }}</div>
+            {% endif %}
+          </div>
+
+          <div class="row">
+            <div class="col-md-4 mb-3">
+              {{ form.impacto.label(class="form-label") }}
+              {{ form.impacto(class="form-select" + (" is-invalid" if form.impacto.errors else "")) }}
+              {% if form.impacto.errors %}
+                <div class="invalid-feedback">{{ form.impacto.errors[0] }}</div>
+              {% endif %}
+            </div>
+            <div class="col-md-4 mb-3">
+              {{ form.urgencia.label(class="form-label") }}
+              {{ form.urgencia(class="form-select" + (" is-invalid" if form.urgencia.errors else "")) }}
+              {% if form.urgencia.errors %}
+                <div class="invalid-feedback">{{ form.urgencia.errors[0] }}</div>
+              {% endif %}
+            </div>
+            <div class="col-md-4 mb-3">
+              {{ form.tipo.label(class="form-label") }}
+              {{ form.tipo(class="form-select" + (" is-invalid" if form.tipo.errors else "")) }}
+              {% if form.tipo.errors %}
+                <div class="invalid-feedback">{{ form.tipo.errors[0] }}</div>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">
+              <i class="fas fa-arrow-left"></i> Voltar
+            </a>
+            {{ form.submit(class="btn btn-primary") }}
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
