@@ -1,0 +1,8 @@
+{
+  "watch": ["app.py", "models.py", "forms.py"],
+  "ext": "py",
+  "exec": "node scripts/python-runner.js watch",
+  "delay": "500",
+  "verbose": false,
+  "ignore": ["instance/", "__pycache__/", "*.pyc", "node_modules/"]
+}

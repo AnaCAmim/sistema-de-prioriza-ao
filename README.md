@@ -1,158 +1,154 @@
-# 📊 Sistema de Priorização de Chamados
+# Sistema de Priorizacao de Chamados de TI
 
-Um sistema web moderno e inteligente para priorizar chamados de TI com base em análise de dados, impacto e urgência.
+Aplicacao web para priorizar chamados de TI com base em **impacto**, **urgencia** e **tipo**.
 
-## 🎯 Funcionalidades
+Stack principal:
+- Backend: Flask + SQLAlchemy + SQLite
+- Frontend: Bootstrap + Chart.js
+- Execucao em desenvolvimento: `npm run dev` (nodemon + Python runner)
 
-### MVP - Fase 1
-✅ **Cadastro de Chamados**
-- Título, descrição, área solicitante
-- Classificação por impacto (baixo/médio/alto)
-- Classificação por urgência (baixa/média/alta)
-- Tipo de chamado (incidente/requisição/problema)
+URL local padrao: `http://127.0.0.1:5000`
 
-✅ **Motor de Cálculo Inteligente**
-- Fórmula ponderada: **Score = (Impacto × 0,4) + (Urgência × 0,4) + (Tipo × 0,2)**
-- Classificação automática de criticidade (Crítica/Alta/Média/Baixa)
-- Ranking ordenado por prioridade
+## Inicio Rapido
 
-✅ **Dashboard Gerencial Moderno**
-- Visualização em tempo real de chamados ordenados por prioridade
-- Cards com estatísticas: Total, Abertos, Críticos, Altos
-- Gráfico de distribuição por criticidade (Doughnut)
-- Gráfico de chamados por área (Bar Chart)
-- Filtros por: Área, Criticidade, Status
-- Tabela interativa com ranking de posição
+No diretorio do projeto, execute:
 
-✅ **Gerenciamento de Chamados**
-- Edição de chamados cadastrados
-- Atualização de status (Aberto → Em Progresso → Aguardando → Resolvido → Fechado)
-- Visualização de detalhes em modal
-- Histórico de criação e atualização
-
-✅ **APIs RESTful**
-- GET `/api/stats` - Retorna estatísticas gerenciais
-- GET `/api/chamado/<id>` - Detalhes de chamado específico
-- POST `/status/<id>/<status>` - Atualizar status
-
-## 🚀 Tecnologia Stack
-
-**Backend:**
-- Flask (Python Web Framework)
-- SQLAlchemy (ORM)
-- Flask-WTF (Validação de formulários)
-
-**Frontend:**
-- Bootstrap 5.3 (Design responsivo)
-- Chart.js (Gráficos interativos)
-- FontAwesome 6.4 (Ícones)
-
-**Database:**
-- SQLite (Desenvolvimento)
-
-## 📥 Instalação
-
-### Pré-requisitos
-- Python 3.8+
-- pip
-
-### Setup
 ```bash
-# 1. Clonar/Entrar no diretório
-cd "sistema de priorizacao"
-
-# 2. Criar ambiente virtual (opcional)
-python -m venv venv
-venv\Scripts\activate  # Windows
-# ou: source venv/bin/activate  # Linux/Mac
-
-# 3. Instalar dependências
-pip install -r requirements.txt
-
-# 4. Executar a aplicação
-python app.py
+npm install
+npm run setup
+npm run dev
 ```
 
-A aplicação estará disponível em: **http://127.0.0.1:5000**
+Opcional para popular dados de exemplo:
 
-## 📋 Estrutura do Projeto
-
-```
-sistema de priorizacao/
-├── app.py                    # Aplicação Flask principal
-├── models.py                 # Modelos de dados (Chamado)
-├── forms.py                  # Formulários WTForms
-├── requirements.txt          # Dependências Python
-├── chamados.db              # Database SQLite (criado automaticamente)
-└── templates/
-    ├── base.html            # Template base com navbar
-    ├── dashboard.html       # Dashboard com gráficos e filtros
-    ├── novo.html           # Formulário de novo chamado
-    └── editar.html         # Formulário de edição
+```bash
+npm run seed
 ```
 
-## 🧮 Fórmula de Cálculo
+## Scripts Disponiveis
 
-```
-Score = (Impacto × 0,4) + (Urgência × 0,4) + (Tipo × 0,2)
+- `npm run setup`: instala dependencias Python de `requirements.txt`
+- `npm run dev`: sobe o servidor em modo desenvolvimento
+- `npm start`: sobe em modo producao local (`FLASK_DEBUG=0`)
+- `npm run test`: executa testes (`pytest`)
+- `npm run seed`: insere chamados de exemplo
+- `npm run install:all`: `npm install` + `npm run setup`
 
-Valores:
-- Impacto: Baixo=1, Médio=2, Alto=3
-- Urgência: Baixa=1, Média=2, Alta=3
-- Tipo: Requisição=1, Problema=2, Incidente=3
+## Funcionalidades
 
-Criticidade (baseada em Score):
-- Score ≥ 2.6: CRÍTICA 🔴
-- Score ≥ 1.8: ALTA 🟠
-- Score ≥ 1.0: MÉDIA 🟡
-- Score < 1.0: BAIXA 🟢
-```
+- Cadastro de chamado com calculo automatico de score
+- Preview de score/criticidade em tempo real no formulario
+- Dashboard com cards, filtros e ranking
+- Graficos por criticidade, tipo e area
+- Edicao e atualizacao de status
+- Exclusao com confirmacao
+- Exportacao CSV
+- API para estatisticas e detalhes
 
-## 📊 Exemplo de Dados
+## Regra de Priorizacao
 
-| Chamado | Impacto | Urgência | Tipo | Score | Criticidade |
-|---------|---------|----------|------|-------|-------------|
-| Servidor Down | 3 | 3 | Incidente | 2.8 | CRÍTICA |
-| Email não funciona | 2 | 2 | Incidente | 2.2 | ALTA |
-| Solicitar Software | 1 | 1 | Requisição | 0.8 | BAIXA |
+Formula usada:
 
-## 🎨 Customização
-
-### Adicionar novas áreas
-Editar `models.py`, linha com `AREAS`:
-```python
-AREAS = ['TI', 'RH', 'Financeiro', 'Sua Nova Área']
+```text
+Score = (Impacto * 0.4) + (Urgencia * 0.4) + (Tipo * 0.2)
 ```
 
-### Alterar pesos da fórmula
-Editar `models.py`, método `calculate_score()`:
-```python
-score = (i * 0.3) + (u * 0.5) + (t * 0.2)  # Novo peso
+Mapeamentos:
+- Impacto: `baixo=1`, `medio=2`, `alto=3`
+- Urgencia: `baixa=1`, `media=2`, `alta=3`
+- Tipo: `requisicao=1`, `problema=2`, `incidente=3`
+
+Faixas de criticidade:
+- `>= 2.6`: Critica
+- `>= 2.0`: Alta
+- `>= 1.4`: Media
+- `< 1.4`: Baixa
+
+## Rotas Principais
+
+Paginas:
+- `GET /`: dashboard
+- `GET /novo`: formulario de criacao
+- `POST /novo`: cria chamado
+- `GET /editar/<id>`: formulario de edicao
+- `POST /editar/<id>`: salva edicao
+- `POST /excluir/<id>`: exclui chamado
+- `GET /exportar`: exporta CSV
+
+API:
+- `GET /api/stats`: estatisticas para os graficos
+- `GET /api/chamado/<id>`: detalhes de um chamado
+- `POST /status/<id>/<status>`: altera status
+
+## Estrutura do Projeto
+
+```text
+app.py
+models.py
+forms.py
+templates/
+scripts/
+tests/
+instance/
+requirements.txt
+package.json
 ```
 
-### Ajustar limiares de criticidade
-Editar `models.py`, método `get_criticidade()`:
-```python
-if score >= 3.0:
-    return 'Crítica'
+## Troubleshooting
+
+### Erro: `ERR_CONNECTION_REFUSED` em `127.0.0.1`
+
+Causa comum: servidor nao esta rodando.
+
+Passos:
+
+```powershell
+Set-Location "c:\Users\anacl\sistema de priorizacao\sistema-de-prioriza-ao"
+npm run dev
 ```
 
-## 🔮 Roadmap (Futuras Versões)
+Verifique se a porta esta ouvindo:
 
-- [ ] Autenticação e controle de acesso
-- [ ] Integração com email para notificações
-- [ ] Dashboard com mais KPIs (tempo médio de atendimento, SLA)
-- [ ] Exportação de relatórios (PDF/Excel)
-- [ ] Mobile app
-- [ ] Sistema de atribuição a técnicos
-- [ ] Histórico de mudanças de status
-- [ ] Integração com LDAP/Active Directory
-- [ ] Análise de padrões e tendências
+```powershell
+Get-NetTCPConnection -LocalPort 5000 -State Listen
+```
 
-## 📞 Suporte
+### Erro de porta em uso (`WinError 10048`)
 
-Para dúvidas ou sugestões, entre em contato!
+Causa comum: mais de uma instancia tentando usar a porta 5000.
 
----
+Limpe processos e suba novamente:
 
-**Desenvolvido com ❤️ para otimizar a gestão de chamados**
+```powershell
+Get-Process python* -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Get-Process node* -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Set-Location "c:\Users\anacl\sistema de priorizacao\sistema-de-prioriza-ao"
+npm run dev
+```
+
+### Formulario de novo chamado nao cria registro
+
+Validacao aplicada no backend para garantir `status='Aberto'` quando o campo nao vier no formulario de criacao.
+
+## Variaveis de Ambiente
+
+Arquivo de exemplo: `.env.example`
+
+Principais variaveis:
+- `FLASK_DEBUG=1`
+- `PORT=5000`
+- `SECRET_KEY=...`
+
+## Testes
+
+Executar suite:
+
+```bash
+npm run test
+```
+
+Ou diretamente com Python:
+
+```bash
+python -m pytest tests -q
+```

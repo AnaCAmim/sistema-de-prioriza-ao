@@ -1,0 +1,20 @@
+{
+  "name": "sistema-de-priorizacao",
+  "version": "1.0.0",
+  "description": "Sistema de Priorização de Chamados de TI — Flask + SQLite",
+  "scripts": {
+    "setup": "node scripts/python-runner.js setup",
+    "dev": "nodemon",
+    "start": "node scripts/python-runner.js start",
+    "seed": "node scripts/python-runner.js seed",
+    "test": "node scripts/python-runner.js test",
+    "install:all": "npm install && npm run setup"
+  },
+  "engines": {
+    "node": ">=18",
+    "npm": ">=9"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}
