@@ -1,67 +1,139 @@
+{#
+  =============================================================================
+  novo.html — Formulário de criação de novo chamado
+  =============================================================================
+  Esta página apresenta o formulário para cadastrar um novo chamado de TI.
+  Funcionalidades:
+  - Campos com validação visual (borda vermelha + mensagem de erro)
+  - Contador de caracteres na descrição (0/2000)
+  - Tooltips explicativos nos campos de impacto, urgência e tipo
+  - Preview do score calculado em tempo real conforme o usuário seleciona
+    os campos, sem precisar enviar o formulário
+
+  O formulário envia dados via POST para a rota /novo do app.py.
+  O campo "status" fica oculto — todo chamado nasce como "Aberto".
+  =============================================================================
+#}
 {% extends 'base.html' %}
 {% block title %}Novo Chamado{% endblock %}
+
 {% block content %}
 <div class="row justify-content-center">
-  <div class="col-md-8">
-    <div class="card">
-      <div class="card-header bg-gradient">
-        <h2 class="mb-0"><i class="fas fa-plus-circle"></i> Cadastro de Chamado</h2>
+  <div class="col-md-8 col-lg-7">
+    <div class="card animate-in">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="fas fa-plus-circle me-2"></i> Cadastrar Novo Chamado</h5>
+        <small class="text-white-50"><i class="fas fa-info-circle me-1"></i> Campos com * são obrigatórios</small>
       </div>
-      <div class="card-body">
-        <form method="post" novalidate>
+      <div class="card-body p-4">
+        <!-- O atributo novalidate desativa a validação nativa do HTML5,
+             pois usamos a validação do WTForms no backend (mais segura).
+             O hidden_tag() gera o campo oculto com o token CSRF. -->
+        <form method="post" novalidate id="chamado-form">
           {{ form.hidden_tag() }}
-          
+
           <div class="mb-3">
-            {{ form.titulo.label(class="form-label") }}
-            {{ form.titulo(class="form-control" + (" is-invalid" if form.titulo.errors else "")) }}
+            {{ form.titulo.label(class="form-label fw-semibold") }} <span class="text-danger">*</span>
+            {{ form.titulo(class="form-control" + (" is-invalid" if form.titulo.errors else ""),
+               placeholder="Ex: Servidor de e-mail fora do ar", maxlength=120,
+               **{'aria-describedby': 'titulo-help'}) }}
+            <div id="titulo-help" class="form-text">Mínimo 3, máximo 120 caracteres.</div>
             {% if form.titulo.errors %}
               <div class="invalid-feedback">{{ form.titulo.errors[0] }}</div>
             {% endif %}
           </div>
 
           <div class="mb-3">
-            {{ form.descricao.label(class="form-label") }}
-            {{ form.descricao(class="form-control", rows="5" + (" is-invalid" if form.descricao.errors else "")) }}
+            {{ form.descricao.label(class="form-label fw-semibold") }} <span class="text-danger">*</span>
+            {{ form.descricao(class="form-control" + (" is-invalid" if form.descricao.errors else ""),
+               rows=4, placeholder="Descreva o problema com detalhes: o que aconteceu, quando, quem foi afetado...",
+               maxlength=2000, **{'aria-describedby': 'desc-help'}) }}
+            <div class="d-flex justify-content-between">
+              <small id="desc-help" class="form-text">Mínimo 10 caracteres.</small>
+              <small class="form-text" id="desc-counter">0 / 2000</small>
+            </div>
             {% if form.descricao.errors %}
               <div class="invalid-feedback">{{ form.descricao.errors[0] }}</div>
             {% endif %}
           </div>
 
           <div class="mb-3">
-            {{ form.area.label(class="form-label") }}
+            {{ form.area.label(class="form-label fw-semibold") }} <span class="text-danger">*</span>
             {{ form.area(class="form-select" + (" is-invalid" if form.area.errors else "")) }}
             {% if form.area.errors %}
               <div class="invalid-feedback">{{ form.area.errors[0] }}</div>
             {% endif %}
           </div>
 
-          <div class="row">
+          <div class="row mb-2">
             <div class="col-md-4 mb-3">
-              {{ form.impacto.label(class="form-label") }}
-              {{ form.impacto(class="form-select" + (" is-invalid" if form.impacto.errors else "")) }}
+              {{ form.impacto.label(class="form-label fw-semibold") }}
+              <i class="fas fa-question-circle text-muted" data-bs-toggle="tooltip"
+                 title="Quantas pessoas ou processos são afetados?"></i>
+              {{ form.impacto(class="form-select" + (" is-invalid" if form.impacto.errors else ""),
+                 id="impacto") }}
               {% if form.impacto.errors %}
                 <div class="invalid-feedback">{{ form.impacto.errors[0] }}</div>
               {% endif %}
             </div>
             <div class="col-md-4 mb-3">
-              {{ form.urgencia.label(class="form-label") }}
-              {{ form.urgencia(class="form-select" + (" is-invalid" if form.urgencia.errors else "")) }}
+              {{ form.urgencia.label(class="form-label fw-semibold") }}
+              <i class="fas fa-question-circle text-muted" data-bs-toggle="tooltip"
+                 title="Qual a velocidade necessária para resolver?"></i>
+              {{ form.urgencia(class="form-select" + (" is-invalid" if form.urgencia.errors else ""),
+                 id="urgencia") }}
               {% if form.urgencia.errors %}
                 <div class="invalid-feedback">{{ form.urgencia.errors[0] }}</div>
               {% endif %}
             </div>
             <div class="col-md-4 mb-3">
-              {{ form.tipo.label(class="form-label") }}
-              {{ form.tipo(class="form-select" + (" is-invalid" if form.tipo.errors else "")) }}
+              {{ form.tipo.label(class="form-label fw-semibold") }}
+              <i class="fas fa-question-circle text-muted" data-bs-toggle="tooltip"
+                 title="Incidente = falha. Problema = causa raiz. Requisição = solicitação."></i>
+              {{ form.tipo(class="form-select" + (" is-invalid" if form.tipo.errors else ""),
+                 id="tipo") }}
               {% if form.tipo.errors %}
                 <div class="invalid-feedback">{{ form.tipo.errors[0] }}</div>
               {% endif %}
             </div>
           </div>
 
-          <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+          {# ── Preview do score em tempo real ──────────────────── #}
+          {# Este card mostra o score calculado pelo JavaScript conforme
+             o usuário seleciona impacto, urgência e tipo. A fórmula é
+             a mesma do backend: (Impacto×0.4) + (Urgência×0.4) + (Tipo×0.2).
+             A barra de progresso e o badge de criticidade atualizam
+             automaticamente sem enviar nada ao servidor. #}
+          <div class="card border mb-3" id="score-preview">
+            <div class="card-body py-3">
+              <div class="d-flex justify-content-between align-items-center">
+                <div>
+                  <i class="fas fa-calculator me-1 text-muted"></i>
+                  <strong>Score:</strong>
+                  <span id="score-valor" class="ms-1 fw-bold fs-5">—</span>
+                  <span class="text-muted"> / 3.00</span>
+                  <span class="mx-2 text-muted">|</span>
+                  <span id="criticidade-badge" class="badge">—</span>
+                </div>
+                <small class="text-muted"><i class="fas fa-sync-alt me-1"></i> Tempo real</small>
+              </div>
+              <div class="progress mt-2" style="height:8px;">
+                <div id="score-bar" class="progress-bar" role="progressbar"
+                     style="width:0%; transition: width .4s ease, background-color .4s ease;"
+                     aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+              </div>
+              <div class="mt-2 d-flex justify-content-between">
+                <small class="text-success">1.00 — Baixa</small>
+                <small class="text-info">1.40 — Média</small>
+                <small class="text-warning">2.00 — Alta</small>
+                <small class="text-danger">2.60 — Crítica</small>
+              </div>
+            </div>
+          </div>
+
+          <div class="d-flex justify-content-end gap-2">
             <a href="{{ url_for('index') }}" class="btn btn-secondary">
-              <i class="fas fa-arrow-left"></i> Voltar
+              <i class="fas fa-arrow-left me-1"></i> Voltar
             </a>
             {{ form.submit(class="btn btn-primary") }}
           </div>
@@ -70,4 +142,93 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// =============================================================================
+// JavaScript do formulário de criação (novo.html)
+// =============================================================================
+// Este script implementa duas funcionalidades:
+// 1. Cálculo do score em tempo real (preview) conforme o usuário muda os selects
+// 2. Contador de caracteres da descrição
+// =============================================================================
+
+// Mapeamento de valores textuais para numéricos (mesma lógica do models.py)
+const WEIGHTS = {
+  impacto: {baixo: 1, medio: 2, alto: 3},
+  urgencia:{baixa: 1, media: 2, alta: 3},
+  tipo:    {incidente: 3, requisicao: 1, problema: 2}
+};
+
+// Faixas de criticidade com seus limites (mesma lógica do models.py)
+const CRIT = [
+  {min: 2.6, label: 'Crítica',  cls: 'bg-danger'},
+  {min: 2.0, label: 'Alta',     cls: 'bg-warning text-dark'},
+  {min: 1.4, label: 'Média',    cls: 'bg-info text-dark'},
+  {min: 0,   label: 'Baixa',    cls: 'bg-success'},
+];
+
+// Cores da barra de progresso por criticidade
+const BAR_CLS = {
+  'Crítica': 'bg-danger', 'Alta': 'bg-warning', 'Média': 'bg-info', 'Baixa': 'bg-success'
+};
+
+/**
+ * Função que recalcula o score sempre que o usuário altera
+ * impacto, urgência ou tipo. Aplica a mesma fórmula ponderada
+ * do backend e atualiza o valor, o badge e a barra de progresso.
+ */
+function atualizarScore() {
+  // Obtém os valores selecionados e converte para números usando o mapeamento
+  const i = WEIGHTS.impacto[document.getElementById('impacto').value]  || 1;
+  const u = WEIGHTS.urgencia[document.getElementById('urgencia').value] || 1;
+  const t = WEIGHTS.tipo[document.getElementById('tipo').value]         || 1;
+
+  // Aplica a fórmula ponderada e arredonda para 2 casas decimais
+  const score = Math.round(((i * 0.4) + (u * 0.4) + (t * 0.2)) * 100) / 100;
+
+  // Encontra a faixa de criticidade correspondente ao score calculado
+  const crit  = CRIT.find(c => score >= c.min);
+
+  // Atualiza o texto do score na tela
+  document.getElementById('score-valor').textContent = score.toFixed(2);
+
+  // Atualiza o badge de criticidade (texto e cor)
+  const badge = document.getElementById('criticidade-badge');
+  badge.textContent  = crit.label;
+  badge.className    = 'badge ' + crit.cls;
+
+  // Atualiza a barra de progresso visual (percentual de 0 a 100)
+  // A escala vai de 1.0 (0%) até 3.0 (100%)
+  const pct = Math.round(((score - 1.0) / 2.0) * 100);
+  const bar = document.getElementById('score-bar');
+  bar.style.width  = pct + '%';
+  bar.className    = 'progress-bar ' + BAR_CLS[crit.label];
+  bar.setAttribute('aria-valuenow', pct);
+}
+
+// Contador de caracteres do campo descrição
+// Mostra "X / 2000" abaixo do textarea e fica vermelho quando ultrapassa 1900
+const descField = document.getElementById('descricao');
+if (descField) {
+  const counter = document.getElementById('desc-counter');
+  descField.addEventListener('input', () => {
+    const len = descField.value.length;
+    counter.textContent = len + ' / 2000';
+    counter.className = len > 1900 ? 'form-text text-danger' : 'form-text';
+  });
+}
+
+// Registra o evento "change" nos 3 selects para recalcular o score em tempo real
+['impacto','urgencia','tipo'].forEach(id =>
+  document.getElementById(id).addEventListener('change', atualizarScore)
+);
+// Calcula o score inicial com os valores padrão dos selects
+atualizarScore();
+
+// Inicializa os tooltips do Bootstrap (os ícones de "?" nos campos)
+const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+tooltipTriggerList.forEach(el => new bootstrap.Tooltip(el));
+</script>
 {% endblock %}

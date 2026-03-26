@@ -1,156 +1,339 @@
+{#
+  =============================================================================
+  dashboard.html — Página principal (Dashboard) do sistema
+  =============================================================================
+  Esta página é a mais complexa da aplicação. Ela exibe:
+  1. Cards de estatísticas gerais (total, abertos, em progresso, etc.)
+  2. Painel gerencial de risco com KPIs (SLA estourado, índice de risco, etc.)
+  3. Gráficos interativos (criticidade, tipo, área) usando Chart.js
+  4. Filtros por área, criticidade e status
+  5. Tabela de ranking com todos os chamados ordenados por prioridade
+  6. Modais para detalhes e confirmação de exclusão
+
+  Dados recebidos do backend (app.py, rota /):
+  - chamados: lista de chamados já ordenada por score
+  - stats: dicionário com contagens gerais
+  - kpis: indicadores de risco gerenciais
+  - sla_limites: prazos de SLA para cada criticidade
+  - areas, status_choices: listas de opções para os filtros
+  =============================================================================
+#}
 {% extends 'base.html' %}
 {% block title %}Dashboard{% endblock %}
+
 {% block content %}
-<div class="row mb-4">
-  <div class="col-md-3">
+
+{# ── Cards de estatísticas gerais ──────────────────────────── #}
+{# Cada card mostra uma métrica resumida do sistema. São renderizados
+   em uma grade responsiva: 6 colunas no desktop, 2 no celular.
+   A classe "animate-in" aplica a animação de entrada suave. #}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-4 col-lg-2 animate-in">
     <div class="stat-card">
-      <h3>Total</h3>
-      <div class="number">{{ stats.total }}</div>
-      <p class="text-muted">Chamados cadastrados</p>
+      <div class="stat-label"><i class="fas fa-ticket-alt text-secondary"></i> Total</div>
+      <div class="stat-number text-secondary">{{ stats.total }}</div>
+      <div class="stat-sub">chamados cadastrados</div>
     </div>
   </div>
-  <div class="col-md-3">
+  <div class="col-6 col-md-4 col-lg-2 animate-in">
     <div class="stat-card">
-      <h3>Abertos</h3>
-      <div class="number">{{ stats.abertos }}</div>
-      <p class="text-muted">Aguardando atendimento</p>
+      <div class="stat-label"><i class="fas fa-inbox text-primary"></i> Abertos</div>
+      <div class="stat-number text-primary">{{ stats.abertos }}</div>
+      <div class="stat-sub">aguardando atendimento</div>
     </div>
   </div>
-  <div class="col-md-3">
+  <div class="col-6 col-md-4 col-lg-2 animate-in">
     <div class="stat-card">
-      <h3>Críticos</h3>
-      <div class="number">{{ stats.critica }}</div>
-      <p class="text-danger">Atenção imediata</p>
+      <div class="stat-label"><i class="fas fa-spinner text-warning"></i> Em Progresso</div>
+      <div class="stat-number text-warning">{{ stats.em_progresso }}</div>
+      <div class="stat-sub">em andamento</div>
     </div>
   </div>
-  <div class="col-md-3">
-    <div class="stat-card">
-      <h3>Altos</h3>
-      <div class="number">{{ stats.alta }}</div>
-      <p class="text-warning">Prioridade alta</p>
+  <div class="col-6 col-md-4 col-lg-2 animate-in">
+    <div class="stat-card" style="border-left: 4px solid var(--critica);">
+      <div class="stat-label"><i class="fas fa-fire text-danger"></i> Críticos</div>
+      <div class="stat-number text-danger">{{ stats.critica }}</div>
+      <div class="stat-sub">atenção imediata</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4 col-lg-2 animate-in">
+    <div class="stat-card" style="border-left: 4px solid var(--alta);">
+      <div class="stat-label"><i class="fas fa-exclamation-circle" style="color:var(--alta)"></i> Altos</div>
+      <div class="stat-number" style="color:var(--alta)">{{ stats.alta }}</div>
+      <div class="stat-sub">prioridade alta</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4 col-lg-2 animate-in">
+    <div class="stat-card" style="border-left: 4px solid var(--baixa);">
+      <div class="stat-label"><i class="fas fa-check-circle text-success"></i> Resolvidos</div>
+      <div class="stat-number text-success">{{ stats.resolvidos }}</div>
+      <div class="stat-sub">encerrados</div>
     </div>
   </div>
 </div>
 
-<div class="row mb-4">
-  <div class="col-md-6">
-    <div class="card">
-      <div class="card-header">
-        <i class="fas fa-chart-pie"></i> Distribuição por Criticidade
+{# ── Painel gerencial de risco (KPIs) ──────────────────────── #}
+{# Exibe indicadores de gestão para acompanhar a saúde dos chamados:
+   - SLA Estourado: quantos chamados ultrapassaram o prazo limite
+   - Próximos do SLA: chamados que estão prestes a estourar
+   - Idade Média: tempo médio (em dias) dos chamados abertos
+   - Índice de Risco: métrica percentual que pondera a gravidade geral
+   Os limites de SLA são definidos no app.py e passados para o template. #}
+<div class="card mb-4 animate-in">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span><i class="fas fa-shield-alt me-1"></i> Painel Gerencial de Risco</span>
+    <small class="text-white-50">
+      SLA: Crítica {{ sla_limites['Crítica'] }}d &bull; Alta {{ sla_limites['Alta'] }}d &bull;
+      Média {{ sla_limites['Média'] }}d &bull; Baixa {{ sla_limites['Baixa'] }}d
+    </small>
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-6 col-md-3">
+        <div class="p-3 rounded-3 h-100" style="background: linear-gradient(135deg, #fff5f5, #ffe3e3); border: 1px solid #fecaca;">
+          <div class="small text-muted fw-semibold"><i class="fas fa-clock text-danger me-1"></i> SLA Estourado</div>
+          <div class="h3 mb-0 text-danger fw-bold">{{ kpis.sla_estourado }}</div>
+          <small class="text-muted">{{ kpis.taxa_sla_estourado }}% dos abertos</small>
+        </div>
       </div>
-      <div class="card-body">
+      <div class="col-6 col-md-3">
+        <div class="p-3 rounded-3 h-100" style="background: linear-gradient(135deg, #fffbeb, #fef3c7); border: 1px solid #fde68a;">
+          <div class="small text-muted fw-semibold"><i class="fas fa-hourglass-half text-warning me-1"></i> Próximos do SLA</div>
+          <div class="h3 mb-0 text-warning fw-bold">{{ kpis.proximos_sla }}</div>
+          <small class="text-muted">limite ou limite−1 dia</small>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="p-3 rounded-3 h-100" style="background: linear-gradient(135deg, #f0f9ff, #e0f2fe); border: 1px solid #bae6fd;">
+          <div class="small text-muted fw-semibold"><i class="fas fa-calendar-day text-info me-1"></i> Idade Média</div>
+          <div class="h3 mb-0 text-info fw-bold">{{ kpis.idade_media }}d</div>
+          <small class="text-muted">{{ kpis.total_abertos }} chamados ativos</small>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="p-3 rounded-3 h-100" style="background: linear-gradient(135deg, #faf5ff, #f3e8ff); border: 1px solid #d8b4fe;">
+          <div class="small text-muted fw-semibold"><i class="fas fa-chart-line me-1" style="color:var(--grad-start)"></i> Índice de Risco</div>
+          <div class="h3 mb-0 fw-bold {{ 'text-danger' if kpis.indice_risco >= 70 else 'text-warning' if kpis.indice_risco >= 40 else 'text-success' }}">
+            {{ kpis.indice_risco }}%
+          </div>
+          <div class="progress mt-1" style="height:5px;">
+            <div class="progress-bar {{ 'bg-danger' if kpis.indice_risco >= 70 else 'bg-warning' if kpis.indice_risco >= 40 else 'bg-success' }}"
+                 style="width:{{ kpis.indice_risco }}%"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Gráficos interativos (Chart.js) ───────────────────────── #}
+{# Quatro gráficos em grid 2×2 carregados via API (/api/stats):
+   1. Barras verticais de criticidade com gradiente de cores
+   2. Barras horizontais por área (setor da empresa)
+   3. Polar area por tipo de chamado
+   4. Barras de status com cores semafóricas
+   Os dados são buscados via fetch() no bloco de scripts abaixo. #}
+<div class="row g-2 mb-4">
+  <div class="col-md-6 animate-in">
+    <div class="card">
+      <div class="card-header"><i class="fas fa-exclamation-triangle me-1"></i> Distribuição por Criticidade</div>
+      <div class="card-body d-flex align-items-center justify-content-center" style="height:200px;">
         <canvas id="criticidadeChart"></canvas>
       </div>
     </div>
   </div>
-  <div class="col-md-6">
+  <div class="col-md-6 animate-in">
     <div class="card">
-      <div class="card-header">
-        <i class="fas fa-chart-bar"></i> Chamados por Área
-      </div>
-      <div class="card-body">
+      <div class="card-header"><i class="fas fa-building me-1"></i> Chamados por Área</div>
+      <div class="card-body" style="height:200px;">
         <canvas id="areaChart"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 animate-in">
+    <div class="card">
+      <div class="card-header"><i class="fas fa-layer-group me-1"></i> Tipo de Chamado</div>
+      <div class="card-body d-flex align-items-center justify-content-center" style="height:200px;">
+        <canvas id="tipoChart"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 animate-in">
+    <div class="card">
+      <div class="card-header"><i class="fas fa-tasks me-1"></i> Chamados por Status</div>
+      <div class="card-body d-flex align-items-center justify-content-center" style="height:200px;">
+        <canvas id="statusChart"></canvas>
       </div>
     </div>
   </div>
 </div>
 
-<div class="card filter-section">
-  <div class="card-header">
-    <i class="fas fa-filter"></i> Filtros
-  </div>
+{# ── Filtros de busca ───────────────────────────────────────── #}
+{# Formulário com 3 dropdowns que permitem ao usuário filtrar a tabela
+   por área, criticidade e status. Os filtros são enviados como query
+   string (método GET), ex.: /?area=TI&criticidade=Crítica
+   O app.py aplica esses filtros na consulta SQL antes de renderizar. #}
+<div class="card filter-section mb-4 animate-in">
+  <div class="card-header"><i class="fas fa-filter me-1"></i> Filtros</div>
   <div class="card-body">
-    <form method="get" class="row g-3">
-      <div class="col-md-4">
-        <select name="area" class="form-select">
+    <form method="get" class="row g-2 align-items-end" role="search" aria-label="Filtrar chamados">
+      <div class="col-md-3">
+        <label for="filter-area" class="form-label small fw-semibold">Área</label>
+        <select name="area" id="filter-area" class="form-select form-select-sm">
           <option value="">Todas as áreas</option>
           {% for area in areas %}
             <option value="{{ area }}" {% if selected_area == area %}selected{% endif %}>{{ area }}</option>
           {% endfor %}
         </select>
       </div>
-      <div class="col-md-4">
-        <select name="criticidade" class="form-select">
-          <option value="">Todas criticidades</option>
-          <option value="Crítica" {% if selected_criticidade == 'Crítica' %}selected{% endif %}>Crítica</option>
-          <option value="Alta" {% if selected_criticidade == 'Alta' %}selected{% endif %}>Alta</option>
-          <option value="Média" {% if selected_criticidade == 'Média' %}selected{% endif %}>Média</option>
-          <option value="Baixa" {% if selected_criticidade == 'Baixa' %}selected{% endif %}>Baixa</option>
+      <div class="col-md-3">
+        <label for="filter-criticidade" class="form-label small fw-semibold">Criticidade</label>
+        <select name="criticidade" id="filter-criticidade" class="form-select form-select-sm">
+          <option value="">Todas</option>
+          {% for crit in ['Crítica','Alta','Média','Baixa'] %}
+            <option value="{{ crit }}" {% if selected_criticidade == crit %}selected{% endif %}>{{ crit }}</option>
+          {% endfor %}
         </select>
       </div>
-      <div class="col-md-4">
-        <select name="status" class="form-select">
-          <option value="">Todos status</option>
-          <option value="Aberto" {% if selected_status == 'Aberto' %}selected{% endif %}>Aberto</option>
-          <option value="Em Progresso" {% if selected_status == 'Em Progresso' %}selected{% endif %}>Em Progresso</option>
-          <option value="Aguardando" {% if selected_status == 'Aguardando' %}selected{% endif %}>Aguardando</option>
-          <option value="Resolvido" {% if selected_status == 'Resolvido' %}selected{% endif %}>Resolvido</option>
-          <option value="Fechado" {% if selected_status == 'Fechado' %}selected{% endif %}>Fechado</option>
+      <div class="col-md-3">
+        <label for="filter-status" class="form-label small fw-semibold">Status</label>
+        <select name="status" id="filter-status" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          {% for st in status_choices %}
+            <option value="{{ st }}" {% if selected_status == st %}selected{% endif %}>{{ st }}</option>
+          {% endfor %}
         </select>
       </div>
-      <div class="col-md-12">
-        <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search"></i> Filtrar</button>
+      <div class="col-md-3 d-flex gap-2">
+        <button type="submit" class="btn btn-primary btn-sm flex-grow-1">
+          <i class="fas fa-search me-1"></i> Filtrar
+        </button>
+        <a href="{{ url_for('index') }}" class="btn btn-outline-secondary btn-sm" title="Limpar todos os filtros">
+          <i class="fas fa-times"></i>
+        </a>
       </div>
     </form>
   </div>
 </div>
 
-<div class="card mt-4">
-  <div class="card-header">
-    <i class="fas fa-list"></i> Ranking de Atendimento
+{# ── Tabela de ranking de chamados ──────────────────────────── #}
+{# Tabela principal que mostra todos os chamados ordenados por prioridade.
+   O 1º lugar recebe um troféu dourado, 2º e 3º recebem medalhas.
+   Cada linha exibe: posição, score com barra de progresso, título com
+   data de criação, área, tipo com ícone, badge de criticidade, dias
+   aberto com indicador de SLA, dropdown de status e botões de ação.
+   Os botões de ação abrem modais para ver detalhes ou confirmar exclusão. #}
+<div class="card mb-5 animate-in">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span><i class="fas fa-list-ol me-1"></i> Ranking de Atendimento</span>
+    <div class="d-flex align-items-center gap-2">
+      <span class="badge bg-light text-dark">
+        {{ total_filtrado }} de {{ total_geral }}
+      </span>
+      <a href="{{ url_for('exportar_csv') }}" class="btn btn-sm btn-light" title="Exportar para CSV/Excel">
+        <i class="fas fa-file-csv me-1"></i> CSV
+      </a>
+    </div>
   </div>
   <div class="table-responsive">
-    <table class="table table-hover mb-0">
+    <table class="table table-hover mb-0 align-middle" aria-label="Ranking de chamados">
       <thead class="table-light">
         <tr>
-          <th style="width: 5%">#</th>
-          <th style="width: 5%">Score</th>
-          <th style="width: 20%">Título</th>
-          <th style="width: 15%">Área</th>
-          <th style="width: 15%">Criticidade</th>
-          <th style="width: 15%">Status</th>
-          <th style="width: 15%">Ações</th>
+          <th scope="col" style="width:4%">#</th>
+          <th scope="col" style="width:7%">Score</th>
+          <th scope="col" style="width:22%">Título</th>
+          <th scope="col" style="width:10%">Área</th>
+          <th scope="col" style="width:9%">Tipo</th>
+          <th scope="col" style="width:10%">Criticidade</th>
+          <th scope="col" style="width:7%">Dias</th>
+          <th scope="col" style="width:13%">Status</th>
+          <th scope="col" style="width:18%">Ações</th>
         </tr>
       </thead>
       <tbody>
         {% if chamados %}
           {% for c in chamados %}
           <tr>
-            <td><strong>#{{ c.posicao }}</strong></td>
-            <td><strong>{{ '%.2f'|format(c.score) }}</strong></td>
             <td>
-              <div title="{{ c.descricao }}">{{ c.titulo[:40] }}...</div>
-              <small class="text-muted">{{ c.data_criacao }}</small>
+              <span class="fw-bold {{ 'text-danger' if c.posicao <= 3 else 'text-muted' }}">
+                {% if c.posicao == 1 %}<i class="fas fa-trophy text-warning"></i>
+                {% elif c.posicao == 2 %}<i class="fas fa-medal text-secondary"></i>
+                {% elif c.posicao == 3 %}<i class="fas fa-medal" style="color:#cd7f32"></i>
+                {% else %}#{{ c.posicao }}{% endif %}
+              </span>
             </td>
-            <td>{{ c.area }}</td>
             <td>
-              <span class="badge {{ c.criticidade.lower() }}">
+              <span class="fw-bold" style="font-size:.95rem;">{{ '%.2f'|format(c.score) }}</span>
+              <div class="progress mt-1" style="height:4px;">
+                <div class="progress-bar {{ 'bg-danger' if c.criticidade == 'Crítica' else 'bg-warning' if c.criticidade == 'Alta' else 'bg-info' if c.criticidade == 'Média' else 'bg-success' }}"
+                     style="width:{{ ((c.score - 1.0) / 2.0 * 100)|round }}%"></div>
+              </div>
+            </td>
+            <td>
+              <div class="fw-semibold" title="{{ c.titulo }}">
+                {% if c.titulo|length > 38 %}{{ c.titulo[:38] }}…{% else %}{{ c.titulo }}{% endif %}
+              </div>
+              <small class="text-muted"><i class="far fa-clock me-1"></i>{{ c.data_criacao.strftime('%d/%m/%Y %H:%M') }}</small>
+            </td>
+            <td><span class="badge bg-light text-dark border">{{ c.area }}</span></td>
+            <td>
+              <small class="text-muted fw-semibold">
+                {% if c.tipo == 'incidente' %}<i class="fas fa-bolt text-danger me-1"></i>Incidente
+                {% elif c.tipo == 'requisicao' %}<i class="fas fa-file-alt text-primary me-1"></i>Requisição
+                {% else %}<i class="fas fa-bug text-warning me-1"></i>Problema{% endif %}
+              </small>
+            </td>
+            <td>
+              <span class="badge {{ c.criticidade | lower | replace('í','i') | replace('é','e') }}">
                 {{ c.criticidade }}
               </span>
             </td>
             <td>
-              <select class="form-select form-select-sm status-select" data-id="{{ c.id }}">
-                <option value="Aberto" {% if c.status == 'Aberto' %}selected{% endif %}>Aberto</option>
-                <option value="Em Progresso" {% if c.status == 'Em Progresso' %}selected{% endif %}>Em Progresso</option>
-                <option value="Aguardando" {% if c.status == 'Aguardando' %}selected{% endif %}>Aguardando</option>
-                <option value="Resolvido" {% if c.status == 'Resolvido' %}selected{% endif %}>Resolvido</option>
-                <option value="Fechado" {% if c.status == 'Fechado' %}selected{% endif %}>Fechado</option>
+              {% if c.dias_aberto is not none %}
+                {% set sla = sla_limites.get(c.criticidade, 4) %}
+                <span class="badge {{ 'bg-danger' if c.dias_aberto > sla else 'bg-warning text-dark' if c.dias_aberto >= sla - 1 else 'bg-secondary' }}"
+                      title="SLA: {{ sla }} dias">
+                  {{ c.dias_aberto }}d
+                </span>
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td>
+              <select class="form-select form-select-sm status-select"
+                      data-id="{{ c.id }}" aria-label="Alterar status do chamado {{ c.id }}">
+                {% for st in status_choices %}
+                  <option value="{{ st }}" {% if c.status == st %}selected{% endif %}>{{ st }}</option>
+                {% endfor %}
               </select>
             </td>
             <td>
-              <a href="{{ url_for('editar_chamado', id=c.id) }}" class="btn btn-sm btn-outline-primary" title="Editar">
-                <i class="fas fa-edit"></i>
-              </a>
-              <button class="btn btn-sm btn-outline-info" onclick="mostrarDetalhes({{ c.id }})" title="Detalhes">
-                <i class="fas fa-eye"></i>
-              </button>
+              <div class="btn-group" role="group" aria-label="Ações para chamado {{ c.id }}">
+                <a href="{{ url_for('editar_chamado', id=c.id) }}"
+                   class="btn btn-sm btn-outline-primary" title="Editar chamado">
+                  <i class="fas fa-edit"></i>
+                </a>
+                <button class="btn btn-sm btn-outline-info"
+                        onclick="mostrarDetalhes({{ c.id }})" title="Ver detalhes">
+                  <i class="fas fa-eye"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger"
+                        onclick="confirmarExclusao({{ c.id }}, '{{ c.titulo | replace("'", "\\'") | truncate(50, true, '…') }}')"
+                        title="Excluir chamado">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </div>
             </td>
           </tr>
           {% endfor %}
         {% else %}
           <tr>
-            <td colspan="7" class="text-center text-muted py-4">
-              <i class="fas fa-inbox"></i> Nenhum chamado encontrado
+            <td colspan="9" class="text-center text-muted py-5">
+              <div class="py-4">
+                <i class="fas fa-inbox fa-3x mb-3 d-block" style="opacity:.3"></i>
+                <p class="fw-semibold mb-1">Nenhum chamado encontrado</p>
+                <small>Ajuste os filtros ou <a href="{{ url_for('novo_chamado') }}">cadastre um novo chamado</a>.</small>
+              </div>
             </td>
           </tr>
         {% endif %}
@@ -159,15 +342,63 @@
   </div>
 </div>
 
-<!-- Modal de Detalhes -->
-<div class="modal fade" id="detalhesModal" tabindex="-1">
-  <div class="modal-dialog modal-lg">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Detalhes do Chamado</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+{# ── Modal de detalhes do chamado ───────────────────────────── #}
+{# Modal do Bootstrap que exibe informações completas de um chamado.
+   O conteúdo é carregado dinamicamente via AJAX (fetch) pela função
+   mostrarDetalhes(id), que consulta /api/chamado/<id> e preenche
+   o HTML interno com os dados recebidos em JSON. #}
+<div class="modal fade" id="detalhesModal" tabindex="-1" aria-labelledby="detalhesModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content" style="border-radius:var(--radius); overflow:hidden;">
+      <div class="modal-header" style="background:linear-gradient(135deg,var(--grad-start),var(--grad-end)); color:#fff;">
+        <h5 class="modal-title" id="detalhesModalLabel"><i class="fas fa-info-circle me-1"></i> Detalhes do Chamado</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
       </div>
-      <div class="modal-body" id="detalhesContent"></div>
+      <div class="modal-body" id="detalhesContent">
+        <div class="text-center py-4">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Carregando...</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Modal de confirmação de exclusão ──────────────────────── #}
+{# Modal que pede confirmação antes de excluir um chamado permanentemente.
+   A função confirmarExclusao(id, titulo) preenche o título no modal
+   e define a action do formulário para /excluir/<id>. O formulário
+   usa método POST e inclui o token CSRF para segurança. #}
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border-radius:var(--radius); overflow:hidden;">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title" id="deleteModalLabel"><i class="fas fa-exclamation-triangle me-1"></i> Confirmar Exclusão</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <p>Você está prestes a excluir o chamado:</p>
+        <p class="fw-bold fs-5" id="delete-titulo">...</p>
+        <div class="alert alert-danger d-flex align-items-center" role="alert">
+          <i class="fas fa-exclamation-circle me-2"></i>
+          <small>Esta ação é <strong>irreversível</strong>. Todos os dados do chamado serão perdidos.</small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          <i class="fas fa-arrow-left me-1"></i> Cancelar
+        </button>
+        <form id="delete-form" method="POST" class="d-inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-danger">
+            <i class="fas fa-trash me-1"></i> Excluir Definitivamente
+          </button>
+        </form>
+      </div>
     </div>
   </div>
 </div>
@@ -176,78 +407,310 @@
 
 {% block scripts %}
 <script>
-  // Gráfico de Criticidade
-  fetch('{{ url_for("api_stats") }}')
-    .then(r => r.json())
-    .then(data => {
-      new Chart(document.getElementById('criticidadeChart'), {
-        type: 'doughnut',
-        data: {
-          labels: ['Crítica', 'Alta', 'Média', 'Baixa'],
-          datasets: [{
-            data: [data.por_criticidade['Crítica'], data.por_criticidade['Alta'], 
-                    data.por_criticidade['Média'], data.por_criticidade['Baixa']],
-            backgroundColor: ['#dc3545', '#fd7e14', '#ffc107', '#28a745']
-          }]
-        },
-        options: { responsive: true, maintainAspectRatio: true }
-      });
+// =============================================================================
+// JavaScript do Dashboard
+// =============================================================================
+// Este bloco contém toda a lógica JavaScript da página principal:
+// 1. Carregamento e renderização dos gráficos via API
+// 2. Atualização de status via AJAX (sem recarregar a página)
+// 3. Modal de detalhes com carregamento dinâmico
+// 4. Modal de confirmação de exclusão
+// =============================================================================
 
-      // Gráfico de Áreas
-      const areas = Object.keys(data.por_area);
-      const areaCounts = Object.values(data.por_area);
-      new Chart(document.getElementById('areaChart'), {
-        type: 'bar',
-        data: {
-          labels: areas,
-          datasets: [{
-            label: 'Chamados',
-            data: areaCounts,
-            backgroundColor: 'rgba(102, 126, 234, 0.8)',
-            borderColor: '#667eea',
-            borderWidth: 1
-          }]
+// ── Gráficos Chart.js ────────────────────────────────────────
+// Faz uma requisição GET para /api/stats, que retorna um JSON com
+// contagens agrupadas por criticidade, tipo, área e status.
+// Com esses dados, criamos quatro gráficos variados usando Chart.js.
+fetch('{{ url_for("api_stats") }}')
+  .then(r => r.json())
+  .then(data => {
+
+    // Gráfico 1: Barras verticais de criticidade
+    // Cada barra tem a cor correspondente ao nível de risco.
+    // Bordas arredondadas e animação de crescimento para visual moderno.
+    new Chart(document.getElementById('criticidadeChart'), {
+      type: 'bar',
+      data: {
+        labels: ['Crítica', 'Alta', 'Média', 'Baixa'],
+        datasets: [{
+          label: 'Chamados',
+          data: [
+            data.por_criticidade['Crítica'],
+            data.por_criticidade['Alta'],
+            data.por_criticidade['Média'],
+            data.por_criticidade['Baixa']
+          ],
+          backgroundColor: [
+            'rgba(220, 53, 69, 0.85)',
+            'rgba(253, 126, 20, 0.85)',
+            'rgba(255, 193, 7, 0.85)',
+            'rgba(25, 135, 84, 0.85)'
+          ],
+          borderColor: ['#dc3545', '#fd7e14', '#ffc107', '#198754'],
+          borderWidth: 2,
+          borderRadius: 8,
+          borderSkipped: false,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        scales: {
+          y: { beginAtZero: true, ticks: { precision: 0, font: { size: 11 } }, grid: { color: 'rgba(0,0,0,0.05)' } },
+          x: { grid: { display: false }, ticks: { font: { weight: 'bold', size: 11 } } }
         },
-        options: { 
-          indexAxis: 'y',
-          responsive: true,
-          maintainAspectRatio: true,
-          scales: { x: { beginAtZero: true } }
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(0,0,0,0.8)',
+            cornerRadius: 8,
+            padding: 10,
+            titleFont: { size: 13 },
+            bodyFont: { size: 12 }
+          }
         }
-      });
+      }
     });
 
-  // Atualizar status
-  document.querySelectorAll('.status-select').forEach(select => {
-    select.addEventListener('change', function() {
-      const id = this.dataset.id;
-      const status = this.value;
-      fetch(`/status/${id}/${status}`, {
-        method: 'POST'
-      }).then(r => r.json()).then(data => {
-        if(data.success) {
-          location.reload();
+    // Gráfico 2: Barras horizontais por área
+    // Mostra quantos chamados cada setor da empresa abriu.
+    // Filtra áreas com contagem > 0 e ordena por quantidade.
+    const areaEntries = Object.entries(data.por_area)
+      .filter(([, v]) => v > 0)
+      .sort((a, b) => b[1] - a[1]);
+    const areaLabels = areaEntries.map(([k]) => k);
+    const areaValues = areaEntries.map(([, v]) => v);
+    // Gradiente de azul para roxo nas barras
+    const areaCores = areaLabels.map((_, i) => {
+      const t = areaLabels.length > 1 ? i / (areaLabels.length - 1) : 0;
+      const r = Math.round(102 + t * 54);
+      const g = Math.round(126 - t * 26);
+      const b = Math.round(234 - t * 34);
+      return `rgba(${r}, ${g}, ${b}, 0.8)`;
+    });
+    new Chart(document.getElementById('areaChart'), {
+      type: 'bar',
+      data: {
+        labels: areaLabels,
+        datasets: [{
+          label: 'Chamados',
+          data: areaValues,
+          backgroundColor: areaCores,
+          borderWidth: 0,
+          borderRadius: 6,
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: true,
+        scales: {
+          x: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: 'rgba(0,0,0,0.05)' } },
+          y: { grid: { display: false }, ticks: { font: { size: 11, weight: '500' } } }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: { backgroundColor: 'rgba(0,0,0,0.8)', cornerRadius: 8, padding: 10 }
         }
-      });
+      }
+    });
+
+    // Gráfico 3: Polar Area por tipo de chamado
+    // Combina o visual de radar com proporção de área para facilitar
+    // a comparação entre Incidentes, Problemas e Requisições.
+    new Chart(document.getElementById('tipoChart'), {
+      type: 'polarArea',
+      data: {
+        labels: ['Incidente', 'Problema', 'Requisição'],
+        datasets: [{
+          data: [
+            data.por_tipo['Incidente'],
+            data.por_tipo['Problema'],
+            data.por_tipo['Requisição']
+          ],
+          backgroundColor: [
+            'rgba(102, 16, 242, 0.7)',
+            'rgba(13, 110, 253, 0.7)',
+            'rgba(32, 201, 151, 0.7)'
+          ],
+          borderColor: ['#6610f2', '#0d6efd', '#20c997'],
+          borderWidth: 2,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        scales: {
+          r: {
+            beginAtZero: true,
+            ticks: { display: false },
+            grid: { color: 'rgba(0,0,0,0.06)' }
+          }
+        },
+        plugins: {
+          legend: { position: 'bottom', labels: { boxWidth: 14, padding: 14, font: { size: 11 } } },
+          tooltip: { backgroundColor: 'rgba(0,0,0,0.8)', cornerRadius: 8, padding: 10 }
+        }
+      }
+    });
+
+    // Gráfico 4: Barras verticais por status
+    // Cores semafóricas: azul (aberto), amarelo (em progresso/aguardando),
+    // verde (resolvido), cinza (fechado) — fácil de interpretar.
+    const statusLabels = ['Aberto', 'Em Progresso', 'Aguardando', 'Resolvido', 'Fechado'];
+    const statusCores  = [
+      'rgba(13, 110, 253, 0.8)',
+      'rgba(255, 193, 7, 0.8)',
+      'rgba(253, 126, 20, 0.8)',
+      'rgba(25, 135, 84, 0.8)',
+      'rgba(108, 117, 125, 0.8)'
+    ];
+    const statusBordas = ['#0d6efd', '#ffc107', '#fd7e14', '#198754', '#6c757d'];
+    const statusValues = statusLabels.map(s => data.por_status[s] || 0);
+    new Chart(document.getElementById('statusChart'), {
+      type: 'bar',
+      data: {
+        labels: statusLabels,
+        datasets: [{
+          label: 'Chamados',
+          data: statusValues,
+          backgroundColor: statusCores,
+          borderColor: statusBordas,
+          borderWidth: 2,
+          borderRadius: 8,
+          borderSkipped: false,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        scales: {
+          y: { beginAtZero: true, ticks: { precision: 0, font: { size: 11 } }, grid: { color: 'rgba(0,0,0,0.05)' } },
+          x: { grid: { display: false }, ticks: { font: { size: 10, weight: '500' } } }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: { backgroundColor: 'rgba(0,0,0,0.8)', cornerRadius: 8, padding: 10 }
+        }
+      }
     });
   });
 
-  function mostrarDetalhes(id) {
-    fetch(`/api/chamado/${id}`)
+// ── Atualização rápida de status via AJAX ─────────────────────
+// Cada linha da tabela possui um dropdown de status. Quando o usuário
+// muda o status, este código envia uma requisição POST para /status/<id>/<status>
+// sem recarregar a página inteira (Single Page Application behavior).
+// O token CSRF é incluído no header para validação de segurança.
+document.querySelectorAll('.status-select').forEach(select => {
+  select.addEventListener('change', function () {
+    const id     = this.dataset.id;     // ID do chamado (data-id no HTML)
+    const status = this.value;           // Novo status selecionado
+    const sel    = this;
+    const original = sel.dataset.original || sel.querySelector('option[selected]')?.value;
+
+    // Desabilita o dropdown durante a requisição para evitar cliques duplos
+    sel.disabled = true;
+    sel.style.opacity = '0.6';
+
+    // Envia a atualização para o backend via POST
+    fetch(`/status/${id}/${encodeURIComponent(status)}`, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': getCsrfToken() }  // Token CSRF no header
+    })
       .then(r => r.json())
       .then(data => {
-        document.getElementById('detalhesContent').innerHTML = `
-          <p><strong>Título:</strong> ${data.titulo}</p>
-          <p><strong>Descrição:</strong> ${data.descricao}</p>
-          <p><strong>Área:</strong> ${data.area}</p>
-          <p><strong>Tipo:</strong> ${data.tipo}</p>
-          <p><strong>Impacto:</strong> ${data.impacto} | <strong>Urgência:</strong> ${data.urgencia}</p>
-          <p><strong>Score:</strong> ${data.score} | <strong>Criticidade:</strong> <span class="badge ${data.criticidade.toLowerCase()}">${data.criticidade}</span></p>
-          <p><strong>Status:</strong> ${data.status}</p>
-          <p><strong>Criado em:</strong> ${data.data_criacao}</p>
-        `;
-        new bootstrap.Modal(document.getElementById('detalhesModal')).show();
+        if (data.success) {
+          // Sucesso: mostra toast verde e recarrega a página para atualizar os KPIs
+          showToast(`Status atualizado para "${status}"`, 'success');
+          setTimeout(() => location.reload(), 800);
+        } else {
+          // Erro retornado pelo backend: reverte o dropdown para o valor anterior
+          showToast('Erro ao atualizar status.', 'danger');
+          sel.value = original;
+          sel.disabled = false;
+          sel.style.opacity = '1';
+        }
+      })
+      .catch(() => {
+        // Erro de rede/comunicação: também reverte o dropdown
+        showToast('Erro de comunicação com o servidor.', 'danger');
+        sel.value = original;
+        sel.disabled = false;
+        sel.style.opacity = '1';
       });
-  }
+  });
+  // Armazena o valor original do select para poder reverter em caso de erro
+  select.dataset.original = select.value;
+});
+
+// ── Modal de detalhes ─────────────────────────────────────────
+// Abre o modal do Bootstrap e carrega os dados do chamado via AJAX.
+// Enquanto carrega, exibe um spinner (indicador de carregamento).
+// Após receber o JSON, monta o HTML com todas as informações do chamado.
+function mostrarDetalhes(id) {
+  const content = document.getElementById('detalhesContent');
+  content.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Carregando...</span></div></div>';
+  new bootstrap.Modal(document.getElementById('detalhesModal')).show();
+
+  fetch(`/api/chamado/${id}`)
+    .then(r => r.json())
+    .then(data => {
+      // Mapas de tradução para exibir rótulos amigáveis no modal
+      const tipoLabel   = {incidente: 'Incidente', requisicao: 'Requisição', problema: 'Problema'};
+      const impLabel    = {baixo: 'Baixo', medio: 'Médio', alto: 'Alto'};
+      const urgLabel    = {baixa: 'Baixa', media: 'Média', alta: 'Alta'};
+      // Classe CSS da criticidade (remove acentos para usar como nome de classe)
+      const critClass   = data.criticidade.toLowerCase().replace('í','i').replace('é','e');
+      // Calcula a porcentagem do score para a barra de progresso (escala 1.0 a 3.0)
+      const pct         = Math.round(((data.score - 1.0) / 2.0) * 100);
+
+      content.innerHTML = `
+        <div class="row">
+          <div class="col-md-7">
+            <h5 class="fw-bold mb-2">${data.titulo}</h5>
+            <p class="text-muted" style="white-space:pre-wrap;">${data.descricao}</p>
+          </div>
+          <div class="col-md-5">
+            <div class="p-3 rounded-3" style="background:var(--surface);">
+              <table class="table table-sm table-borderless mb-0">
+                <tr><th class="text-muted" style="width:40%">ID</th><td><strong>#${data.id}</strong></td></tr>
+                <tr><th class="text-muted">Área</th><td>${data.area}</td></tr>
+                <tr><th class="text-muted">Tipo</th><td>${tipoLabel[data.tipo] || data.tipo}</td></tr>
+                <tr><th class="text-muted">Impacto</th><td>${impLabel[data.impacto] || data.impacto}</td></tr>
+                <tr><th class="text-muted">Urgência</th><td>${urgLabel[data.urgencia] || data.urgencia}</td></tr>
+                <tr><th class="text-muted">Score</th><td>
+                  <strong>${data.score.toFixed(2)}</strong><small class="text-muted"> / 3.00</small>
+                  <div class="progress mt-1" style="height:4px;">
+                    <div class="progress-bar bg-${data.criticidade === 'Crítica' ? 'danger' : data.criticidade === 'Alta' ? 'warning' : data.criticidade === 'Média' ? 'info' : 'success'}"
+                         style="width:${pct}%"></div>
+                  </div>
+                </td></tr>
+                <tr><th class="text-muted">Criticidade</th><td><span class="badge ${critClass}">${data.criticidade}</span></td></tr>
+                <tr><th class="text-muted">Status</th><td>${data.status}</td></tr>
+                <tr><th class="text-muted">Criado em</th><td>${data.data_criacao}</td></tr>
+                <tr><th class="text-muted">Dias aberto</th><td>${data.dias_aberto !== null ? data.dias_aberto + ' dia(s)' : '<span class="text-success">Encerrado</span>'}</td></tr>
+              </table>
+            </div>
+            <div class="mt-2 text-end">
+              <a href="/editar/${data.id}" class="btn btn-sm btn-outline-primary">
+                <i class="fas fa-edit me-1"></i> Editar
+              </a>
+            </div>
+          </div>
+        </div>`;
+    })
+    .catch(() => {
+      content.innerHTML = '<div class="alert alert-danger">Erro ao carregar detalhes.</div>';
+    });
+}
+
+// ── Modal de confirmação de exclusão ──────────────────────────
+// Preenche o modal com o título do chamado e define a URL de exclusão.
+// O formulário dentro do modal faz um POST para /excluir/<id>.
+function confirmarExclusao(id, titulo) {
+  document.getElementById('delete-titulo').textContent = titulo;
+  document.getElementById('delete-form').action = `/excluir/${id}`;
+  new bootstrap.Modal(document.getElementById('deleteModal')).show();
+}
 </script>
 {% endblock %}
