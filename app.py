@@ -4,17 +4,35 @@ from models import db, Chamado, AREAS, STATUS_CHOICES
 from forms import ChamadoForm
 from sqlalchemy import func
 import json
+import os
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///chamados.db'
+# Usa caminho absoluto para o SQLite para evitar abrir bancos diferentes
+# quando o app eh iniciado em diretorios distintos.
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_DIR = os.path.join(BASE_DIR, 'instance')
+os.makedirs(DB_DIR, exist_ok=True)
+DB_PATH = os.path.join(DB_DIR, 'chamados.db')
+
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{DB_PATH}'
 app.config['SECRET_KEY'] = 'dev-secret'
 db.init_app(app)
+app.config['_DB_READY'] = False
 
 def init_db():
     with app.app_context():
         db.create_all()
+        app.config['_DB_READY'] = True
 
 init_db()
+
+
+@app.before_request
+def ensure_db_ready():
+    # Fallback para garantir que a tabela exista antes de cada requisicao.
+    if not app.config.get('_DB_READY'):
+        db.create_all()
+        app.config['_DB_READY'] = True
 
 @app.route('/')
 def index():
