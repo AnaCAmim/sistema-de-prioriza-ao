@@ -1,32 +1,77 @@
+{#
+  =============================================================================
+  editar.html — Formulário de edição de chamado existente
+  =============================================================================
+  Similar ao novo.html, mas com algumas diferenças:
+  - Mostra um banner superior com o score atual, data de criação, dias aberto e status
+  - O campo de status é visível (o operador pode alterar o status aqui)
+  - O preview do score mostra o valor anterior para comparação
+  - Os campos já vêm preenchidos com os dados atuais do chamado
+
+  Recebe do backend (rota /editar/<id>):
+  - form: formulário WTForms já populado com os dados do chamado
+  - chamado: objeto Chamado completo com todas as propriedades
+  =============================================================================
+#}
 {% extends 'base.html' %}
 {% block title %}Editar Chamado #{{ chamado.id }}{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
   <div class="col-md-8 col-lg-7">
-    <div class="card">
+    <div class="card animate-in">
       <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0"><i class="fas fa-edit me-2"></i> Editar Chamado #{{ chamado.id }}</h5>
         <span class="badge {{ chamado.criticidade | lower | replace('í','i') | replace('é','e') }}">
           {{ chamado.criticidade }}
         </span>
       </div>
-      <div class="card-body">
+      <div class="card-body p-4">
+
+        {# Banner informativo: resume o estado atual do chamado antes da edição.
+           Mostra score atual, data de criação, dias aberto e status em linha. #}
+        <div class="d-flex gap-3 mb-3 p-3 rounded-3" style="background:var(--surface); border:1px solid #e9ecef;">
+          <div class="text-center">
+            <small class="text-muted d-block">Score Atual</small>
+            <strong class="fs-4 text-grad">{{ '%.2f'|format(chamado.score) }}</strong>
+          </div>
+          <div class="vr"></div>
+          <div class="text-center">
+            <small class="text-muted d-block">Criado em</small>
+            <strong>{{ chamado.data_criacao.strftime('%d/%m/%Y') }}</strong>
+          </div>
+          <div class="vr"></div>
+          <div class="text-center">
+            <small class="text-muted d-block">Dias aberto</small>
+            <strong class="{{ 'text-danger' if chamado.dias_aberto is not none and chamado.dias_aberto > 3 else '' }}">
+              {% if chamado.dias_aberto is not none %}{{ chamado.dias_aberto }}d{% else %}<span class="text-success">Encerrado</span>{% endif %}
+            </strong>
+          </div>
+          <div class="vr"></div>
+          <div class="text-center">
+            <small class="text-muted d-block">Status</small>
+            <strong>{{ chamado.status }}</strong>
+          </div>
+        </div>
+
         <form method="post" novalidate>
           {{ form.hidden_tag() }}
 
           <div class="mb-3">
-            {{ form.titulo.label(class="form-label fw-semibold") }}
-            {{ form.titulo(class="form-control" + (" is-invalid" if form.titulo.errors else "")) }}
+            {{ form.titulo.label(class="form-label fw-semibold") }} <span class="text-danger">*</span>
+            {{ form.titulo(class="form-control" + (" is-invalid" if form.titulo.errors else ""), maxlength=120) }}
             {% if form.titulo.errors %}
               <div class="invalid-feedback">{{ form.titulo.errors[0] }}</div>
             {% endif %}
           </div>
 
           <div class="mb-3">
-            {{ form.descricao.label(class="form-label fw-semibold") }}
+            {{ form.descricao.label(class="form-label fw-semibold") }} <span class="text-danger">*</span>
             {{ form.descricao(class="form-control" + (" is-invalid" if form.descricao.errors else ""),
-               rows=5) }}
+               rows=4, maxlength=2000) }}
+            <div class="text-end">
+              <small class="form-text" id="desc-counter">0 / 2000</small>
+            </div>
             {% if form.descricao.errors %}
               <div class="invalid-feedback">{{ form.descricao.errors[0] }}</div>
             {% endif %}
@@ -52,6 +97,8 @@
           <div class="row mb-2">
             <div class="col-md-4 mb-3">
               {{ form.impacto.label(class="form-label fw-semibold") }}
+              <i class="fas fa-question-circle text-muted" data-bs-toggle="tooltip"
+                 title="Quantas pessoas ou processos são afetados?"></i>
               {{ form.impacto(class="form-select" + (" is-invalid" if form.impacto.errors else ""),
                  id="impacto") }}
               {% if form.impacto.errors %}
@@ -60,6 +107,8 @@
             </div>
             <div class="col-md-4 mb-3">
               {{ form.urgencia.label(class="form-label fw-semibold") }}
+              <i class="fas fa-question-circle text-muted" data-bs-toggle="tooltip"
+                 title="Qual a velocidade necessária para resolver?"></i>
               {{ form.urgencia(class="form-select" + (" is-invalid" if form.urgencia.errors else ""),
                  id="urgencia") }}
               {% if form.urgencia.errors %}
@@ -68,6 +117,8 @@
             </div>
             <div class="col-md-4 mb-3">
               {{ form.tipo.label(class="form-label fw-semibold") }}
+              <i class="fas fa-question-circle text-muted" data-bs-toggle="tooltip"
+                 title="Incidente = falha. Problema = causa raiz. Requisição = solicitação."></i>
               {{ form.tipo(class="form-select" + (" is-invalid" if form.tipo.errors else ""),
                  id="tipo") }}
               {% if form.tipo.errors %}
@@ -76,25 +127,32 @@
             </div>
           </div>
 
-          {# Live score preview #}
-          <div class="alert alert-light border mb-3" id="score-preview">
-            <div class="d-flex justify-content-between align-items-center">
-              <div>
-                <strong>Score calculado:</strong>
-                <span id="score-valor" class="ms-1 fw-bold">—</span>
-                <span class="text-muted"> / 3.00 &nbsp;|&nbsp; Criticidade: </span>
-                <span id="criticidade-badge" class="badge">—</span>
+          {# ── Preview do novo score (atualiza em tempo real) ──── #}
+          {# Funciona como no novo.html, mas também mostra o score anterior
+             para que o operador possa comparar antes de salvar. #}
+          <div class="card border mb-3" id="score-preview">
+            <div class="card-body py-3">
+              <div class="d-flex justify-content-between align-items-center">
+                <div>
+                  <i class="fas fa-calculator me-1 text-muted"></i>
+                  <strong>Novo Score:</strong>
+                  <span id="score-valor" class="ms-1 fw-bold fs-5">—</span>
+                  <span class="text-muted"> / 3.00</span>
+                  <span class="mx-2 text-muted">|</span>
+                  <span id="criticidade-badge" class="badge">—</span>
+                </div>
+                <small class="text-muted">Anterior: <strong>{{ '%.2f'|format(chamado.score) }}</strong></small>
               </div>
-              <small class="text-muted">Score atual: {{ '%.2f'|format(chamado.score) }}</small>
-            </div>
-            <div class="progress mt-2" style="height:6px;">
-              <div id="score-bar" class="progress-bar" role="progressbar"
-                   style="width:0%; transition: width .3s ease;"></div>
+              <div class="progress mt-2" style="height:8px;">
+                <div id="score-bar" class="progress-bar" role="progressbar"
+                     style="width:0%; transition: width .4s ease, background-color .4s ease;"></div>
+              </div>
             </div>
           </div>
 
           <div class="d-flex justify-content-between align-items-center">
             <small class="text-muted">
+              <i class="far fa-clock me-1"></i>
               Criado em {{ chamado.data_criacao.strftime('%d/%m/%Y %H:%M') }}
               {% if chamado.dias_aberto is not none %}
                 &mdash; {{ chamado.dias_aberto }} dia(s) aberto
@@ -104,7 +162,7 @@
               <a href="{{ url_for('index') }}" class="btn btn-secondary">
                 <i class="fas fa-arrow-left me-1"></i> Voltar
               </a>
-              {{ form.submit(class="btn btn-primary", value="Salvar") }}
+              {{ form.submit(class="btn btn-primary", value="Salvar Alterações") }}
             </div>
           </div>
         </form>
@@ -116,21 +174,36 @@
 
 {% block scripts %}
 <script>
+// =============================================================================
+// JavaScript do formulário de edição (editar.html)
+// =============================================================================
+// Mesmo comportamento do novo.html: cálculo de score em tempo real,
+// contador de caracteres e inicialização de tooltips.
+// A diferença é que os campos já possuem valores preenchidos ao carregar.
+// =============================================================================
+
+// Mapeamento de valores (igual ao models.py)
 const WEIGHTS = {
   impacto: {baixo: 1, medio: 2, alto: 3},
   urgencia:{baixa: 1, media: 2, alta: 3},
   tipo:    {incidente: 3, requisicao: 1, problema: 2}
 };
+// Faixas de criticidade (mesma lógica do backend)
 const CRIT = [
   {min: 2.6, label: 'Crítica',  cls: 'bg-danger'},
   {min: 2.0, label: 'Alta',     cls: 'bg-warning text-dark'},
   {min: 1.4, label: 'Média',    cls: 'bg-info text-dark'},
   {min: 0,   label: 'Baixa',    cls: 'bg-success'},
 ];
+// Cores da barra de progresso por criticidade
 const BAR_CLS = {
   'Crítica': 'bg-danger', 'Alta': 'bg-warning', 'Média': 'bg-info', 'Baixa': 'bg-success'
 };
 
+/**
+ * Recalcula o score com base nos valores atuais dos selects.
+ * Reutiliza a mesma fórmula ponderada: (I×0.4) + (U×0.4) + (T×0.2)
+ */
 function atualizarScore() {
   const i = WEIGHTS.impacto[document.getElementById('impacto').value]  || 1;
   const u = WEIGHTS.urgencia[document.getElementById('urgencia').value] || 1;
@@ -148,9 +221,29 @@ function atualizarScore() {
   bar.style.width  = pct + '%';
   bar.className    = 'progress-bar ' + BAR_CLS[crit.label];
 }
+
+// Contador de caracteres da descrição (mesmo comportamento do novo.html)
+const descField = document.getElementById('descricao');
+if (descField) {
+  const counter = document.getElementById('desc-counter');
+  const update = () => {
+    const len = descField.value.length;
+    counter.textContent = len + ' / 2000';
+    counter.className = len > 1900 ? 'form-text text-danger' : 'form-text';
+  };
+  descField.addEventListener('input', update);
+  update();
+}
+
+// Registra listeners para atualizar score ao mudar os selects
 ['impacto','urgencia','tipo'].forEach(id =>
   document.getElementById(id).addEventListener('change', atualizarScore)
 );
+// Calcula o score com os valores já preenchidos do chamado
 atualizarScore();
+
+// Inicializa tooltips do Bootstrap
+const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+tooltipTriggerList.forEach(el => new bootstrap.Tooltip(el));
 </script>
 {% endblock %}
